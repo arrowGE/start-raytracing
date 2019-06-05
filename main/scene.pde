@@ -1,4 +1,5 @@
 final int DEPTH_MAX = 10; // トレースの最大回数
+final float VACUUM_REFRACTIVE_INDEX = 1.0; // 真空の屈折率
 
 // シーン
 class Scene {
@@ -30,20 +31,39 @@ class Scene {
     Material m = isect.material;//交差したオブジェクトの材質
     Spectrum l = BLACK; // ここに最終的な計算結果が入る
 
-    // 鏡面反射成分
-    float ks = m.reflective;//どれくらいが正反射するか
-    if (0 < ks) {//マテリアルが鏡面反射を起こすとき
-      Vec r = ray.dir.reflect(isect.n); // 反射レイを導出
-      Spectrum c = trace(new Ray(isect.p, r), depth + 1); // 反射点からレイを飛ばしてレイトレーシング
-      l = l.add(c.scale(ks).mul(m.diffuse)); // 計算結果に鏡面反射成分を足す
-    }
 
-    // 拡散反射成分
-    float kd = 1.0 - ks;//正反射(鏡面反射)しなかった分は拡散反射になる
-    if (0 < kd) {
-      Spectrum c = this.lighting(isect.p, isect.n, isect.material); // 拡散反射面の光源計算を行う
-      l = l.add(c.scale(kd)); // 計算結果に拡散反射成分を足す
+    if(isect.n.dot(ray.dir) < 0){// 物体に外側から接触したとき=空気中から物体に入射したとき
+      
+      // 鏡面反射成分
+      float ks = m.reflective;//どれくらいが正反射するか
+      if (0 < ks) {//マテリアルが鏡面反射を起こすとき
+        Vec r = ray.dir.reflect(isect.n); // 反射レイを導出
+        Spectrum c = trace(new Ray(isect.p, r), depth + 1); // 反射点からレイを飛ばしてレイトレーシング
+        l = l.add(c.scale(ks).mul(m.diffuse)); // 計算結果に鏡面反射成分を足す
+      }
+      
+      // 屈折成分
+      float kt = m.refractive;
+      if (0 < kt) {
+        Vec r = ray.dir.refract(isect.n, VACUUM_REFRACTIVE_INDEX / m.refractiveIndex); // 屈折レイを導出
+        Spectrum c = trace(new Ray(isect.p, r), depth + 1); // 屈折レイを飛ばす
+        l = l.add(c.scale(kt).mul(m.diffuse)); // 計算結果に屈折成分を足す
+      }
+
+
+      // 拡散反射成分
+      float kd = 1.0 - ks - kt;//正反射(鏡面反射)しなかった分と屈折しなかった分は拡散反射になる
+      if (0 < kd) {
+        Spectrum c = this.lighting(isect.p, isect.n, isect.material); // 拡散反射面の光源計算を行う
+        l = l.add(c.scale(kd)); // 計算結果に拡散反射成分を足す
+      }
+      
+    }else { //物体の内側からレイが飛び出していくとき
+      Vec r = ray.dir.refract(isect.n.neg(), m.refractiveIndex / VACUUM_REFRACTIVE_INDEX); // 屈折レイを導出
+      l = trace(new Ray(isect.p, r), depth + 1); // 屈折レイを飛ばす
     }
+    
+    
 
     return l;
   }
