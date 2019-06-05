@@ -67,6 +67,33 @@ class Vec {
     }
     return this.reflect(n); // 全反射
   }
+  
+  // 半球上のランダムな方向を選択する
+  Vec randomHemisphere() {
+    Vec dir = new Vec(0.0, 0.0, 0.0);
+
+    // [1] 無限ループ、念のため100回で打ち切る
+    for (int i = 0; i < 100; i ++) {
+      // [2] 立方体内部のランダムな点を決定する
+      dir = new Vec(
+        random(-1.0, 1.0),
+        random(-1.0, 1.0),
+        random(-1.0, 1.0)
+      );
+
+      // [3] 半径1の球内部であればその点を採用しループを抜ける
+      if (dir.len() < 1.0) { break; }
+    }
+
+    // [4] 正規化し、方向を求める
+    dir = dir.normalize();
+
+    // [5] 法線方向の半球上に合わせる
+    if (dir.dot(this) < 0) { dir = dir.neg(); }
+
+    return dir;
+  }
+
 
   // ベクトルを文字列として返す
   String toString() {

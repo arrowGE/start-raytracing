@@ -1,5 +1,6 @@
 final int DEPTH_MAX = 10; // トレースの最大回数
 final float VACUUM_REFRACTIVE_INDEX = 1.0; // 真空の屈折率
+final Spectrum COLOR_SKY = new Spectrum(0.7, 0.7, 0.7); //空の色
 
 // シーン
 class Scene {
@@ -7,7 +8,14 @@ class Scene {
   ArrayList<Intersectable> objList = new ArrayList<Intersectable>();
   ArrayList<Light> lightList = new ArrayList<Light>();
   
+  Spectrum skyColor = BLACK;
+  
   Scene() {}
+  
+  // 空の色を決める
+  void setSkyColor(Spectrum c) {
+    this.skyColor = c;
+  }
 
   // 形状の追加
   void addIntersectable(Intersectable obj) {
@@ -19,7 +27,7 @@ class Scene {
     this.lightList.add(light);
   }
 
-  // レイを撃って色を求める
+  /*// レイを撃って色を求める(レイトレーシング)
   Spectrum trace(Ray ray, int depth) {
     // トレースの最大回数に達した場合は計算を中断する
     if (DEPTH_MAX < depth) { return BLACK; }
@@ -66,7 +74,82 @@ class Scene {
     
 
     return l;
+  }*/
+  
+  // 交点からのレイの方向を求め追跡する
+  Spectrum interactSurface(Vec rayDir, Vec p, Vec n, Material m, float eta, int depth) {
+    float ks = m.reflective;
+    float kt = m.refractive;
+
+    float t = random(0.0, 1.0);//乱数(0~1.0)
+    
+    if (t < ks) {              // 鏡面反射
+      Vec r = rayDir.reflect(n); // 反射レイを導出
+      Spectrum c = trace(new Ray(p, r), depth + 1);//交点を始点とし反射方向でトレース
+      return c.mul(m.diffuse);
+    } else if (t < ks + kt) {  // 屈折
+      Vec r = rayDir.refract(n, eta); // 屈折レイを導出
+      Spectrum c = trace(new Ray(p, r), depth + 1);//交点を始点とし屈折方向でトレース
+      return c.mul(m.diffuse);
+    } else {                   // 拡散反射
+      Vec r = n.randomHemisphere();
+      Spectrum li = trace(new Ray(p, r), depth + 1);
+
+      Spectrum fr = m.diffuse.scale(1.0 / PI);
+      float factor = 2.0 * PI * n.dot(r);
+      Spectrum l = li.mul(fr).scale(factor);
+
+      return l;
+    }
   }
+  
+    // レイを撃って色を求める
+  Spectrum trace(Ray ray, int depth) {
+    // トレースの最大回数に達した場合は計算を中断する
+    if (DEPTH_MAX < depth) { return BLACK; }
+
+    // 交点を求める
+    Intersection isect = this.findNearestIntersection(ray);
+
+    // 物体と交差しなかった場合は空の色を返す
+    if (!isect.hit()) { return this.skyColor; }
+
+    Material m = isect.material;
+    float dot = isect.n.dot(ray.dir);//法線とレイの内積
+
+    if (dot < 0) { // 物体に外側から接触したとき=空気中から物体に入射したとき
+      Spectrum col = interactSurface(ray.dir, isect.p, isect.n, m, VACUUM_REFRACTIVE_INDEX / m.refractiveIndex, depth);
+      return col.add(m.emissive.scale(-dot));
+
+    } else { //物体の内側からレイが飛び出していくとき
+      return interactSurface(ray.dir, isect.p, isect.n.neg(), m, m.refractiveIndex / VACUUM_REFRACTIVE_INDEX, depth);
+    }
+  }
+  
+  /*// レイを撃って色を求める(パストレーシング)
+  Spectrum trace(Ray ray, int depth) {
+    // トレースの最大回数に達した場合は計算を中断する
+    if (DEPTH_MAX < depth) { return BLACK; }
+
+    // 交点を求める
+    Intersection isect = this.findNearestIntersection(ray);
+
+    // [1] 物体と交差しなかった場合は空の色を返す
+    if (!isect.hit()) { return COLOR_SKY; }
+
+    Material m = isect.material;
+
+    // [2] 反射方向を求め、反射レイを飛ばす
+    Vec r = isect.n.randomHemisphere();
+    Spectrum li = trace(new Ray(isect.p, r), depth + 1);
+
+    // [3] 計算結果への影響度合いを計算する
+    Spectrum fr = m.diffuse.scale(1.0 / PI);
+    float factor = 2.0 * PI * isect.n.dot(r);
+    Spectrum l = li.mul(fr).scale(factor);
+
+    return l;
+  }*/
 
   // 一番近くの交点を求める
   Intersection findNearestIntersection(Ray ray) {

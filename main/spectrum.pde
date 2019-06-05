@@ -1,3 +1,5 @@
+final float DISPLAY_GAMMA = 2.2;//ガンマ補正
+
 // 光を表現するクラス
 class Spectrum {
   float r, g, b;
@@ -18,11 +20,12 @@ class Spectrum {
   Spectrum scale(float s) {
     return new Spectrum(this.r * s, this.g * s, this.b * s);
   }
-  // 表示色に変換
+  //表示色に変換
   color toColor() {
-    int ir = (int)min(this.r * 255, 255);
-    int ig = (int)min(this.g * 255, 255);
-    int ib = (int)min(this.b * 255, 255);
+    // ガンマ補正
+    int ir = (int)min(pow(this.r, 1.0 / DISPLAY_GAMMA) * 255, 255);
+    int ig = (int)min(pow(this.g, 1.0 / DISPLAY_GAMMA) * 255, 255);
+    int ib = (int)min(pow(this.b, 1.0 / DISPLAY_GAMMA) * 255, 255);
     return color(ir, ig, ib);
   }
 }
